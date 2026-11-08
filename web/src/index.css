@@ -1,0 +1,72 @@
+@import 'tailwindcss';
+@import '@fontsource-variable/geist';
+@import '@fontsource-variable/geist-mono';
+
+/*
+ * Pulse design tokens
+ * - Neutrals: one warm-neutral ramp ("ink" on "paper"); dark mode via prefers-color-scheme.
+ * - Accent: one coral ("pulse"). Used for brand + primary actions only.
+ * - Answer colours (opt-a..f) are functional, paired with letters, never decoration.
+ * - Shape system: controls (buttons, chips) are full pills; inputs rounded-2xl; surfaces rounded-3xl.
+ */
+@theme {
+  --font-sans: 'Geist Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'Geist Mono Variable', ui-monospace, monospace;
+
+  --color-paper: #f4f3ef;
+  --color-paper-2: #eae8e1;
+  --color-card: #fbfbf9;
+  --color-ink: #141413;
+  --color-ink-2: #55534d;
+  --color-line: #dcd9d0;
+
+  --color-pulse: #f0532f;
+  --color-pulse-ink: #fff8f5;
+  --color-pulse-soft: #fde3da;
+
+  --color-good: #16835a;
+  --color-bad: #c9372c;
+
+  --color-opt-a: #2259d6;
+  --color-opt-b: #e8a21a;
+  --color-opt-c: #0f8a7e;
+  --color-opt-d: #7b4bd1;
+  --color-opt-e: #4f7d1a;
+  --color-opt-f: #b8336a;
+
+  --animate-marquee: marquee 38s linear infinite;
+  --animate-beat: beat 1.6s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-paper: #0f0f10;
+    --color-paper-2: #1a1a1c;
+    --color-card: #161618;
+    --color-ink: #f2f1ec;
+    --color-ink-2: #a7a59d;
+    --color-line: #2b2b2e;
+    --color-pulse-soft: #3a1a12;
+  }
+}
+
+@keyframes marquee {
+  to { transform: translateX(-50%); }
+}
+@keyframes beat {
+  0% { transform: scale(0.85); opacity: 0.7; }
+  70%, 100% { transform: scale(1.6); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+html { background: var(--color-paper); color: var(--color-ink); -webkit-tap-highlight-color: transparent; }
+body { font-family: var(--font-sans); font-feature-settings: 'ss01'; }
+::selection { background: var(--color-pulse); color: var(--color-pulse-ink); }
+:focus-visible { outline: 2px solid var(--color-pulse); outline-offset: 2px; }
