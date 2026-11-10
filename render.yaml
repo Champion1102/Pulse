@@ -1,0 +1,23 @@
+# Render Blueprint: New > Blueprint > pick this repo.
+# One web service: Express serves the API, Socket.IO and the built React app.
+# Keep it at ONE instance: live rooms are held in memory (see docs/scaling.md).
+services:
+  - type: web
+    name: pulse
+    runtime: node
+    plan: free
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: npm start
+    healthCheckPath: /healthz
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      # Postgres connection string (Neon / Supabase / Render Postgres). Without it, data resets on every restart.
+      - key: DATABASE_URL
+        sync: false
+      # Optional: enables Claude for AI drafts. Without it, the offline drafter is used.
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      # Optional: the public URL shown on the projector, e.g. https://pulse-xxxx.onrender.com
+      - key: PUBLIC_URL
+        sync: false
