@@ -1,49 +1,48 @@
-import { motion } from 'motion/react';
+import { Fire, Lightning, Target } from '@phosphor-icons/react';
+import { AnimatePresence, motion } from 'motion/react';
 import { useState } from 'react';
-import { cx } from '../ui';
+import { ease } from '../../lib/motion';
+import { AnimatedNumber, Segmented } from '../ui';
 
 // Interactive: shows how the same answers score under each Strategy.
 const MODES = [
-  { id: 'accuracy', label: 'Accuracy', rows: [1000, 1000, 0], note: 'Right is right. Speed does not matter.' },
-  { id: 'speed', label: 'Speed bonus', rows: [960, 640, 0], note: 'Fast correct answers earn up to double.' },
-  { id: 'streak', label: 'Streaks', rows: [1300, 1000, 0], note: 'Each correct answer in a row adds a bonus.' },
-];
+  { id: 'accuracy', label: 'Accuracy', icon: <Target weight="bold" />, rows: [1000, 1000, 0], note: 'Right is right. Speed does not matter.' },
+  { id: 'speed', label: 'Speed bonus', icon: <Lightning weight="bold" />, rows: [960, 640, 0], note: 'Fast correct answers earn up to double.' },
+  { id: 'streak', label: 'Streaks', icon: <Fire weight="bold" />, rows: [1300, 1000, 0], note: 'Each correct answer in a row adds a bonus.' },
+] as const;
+type ModeId = (typeof MODES)[number]['id'];
 const WHO = ['Answered in 2s, 4th correct in a row', 'Answered in 14s, first correct', 'Wrong answer'];
+const MAX = 1300;
 
 export function ModeSwitcher() {
-  const [mode, setMode] = useState(MODES[1]);
+  const [id, setId] = useState<ModeId>('speed');
+  const mode = MODES.find((m) => m.id === id)!;
   return (
     <div className="grid gap-5">
-      <div className="flex flex-wrap gap-2" role="tablist">
-        {MODES.map((m) => (
-          <button
-            key={m.id}
-            role="tab"
-            aria-selected={m.id === mode.id}
-            onClick={() => setMode(m)}
-            className={cx(
-              'relative rounded-full px-4 py-2 text-sm font-semibold transition',
-              m.id === mode.id ? 'text-paper' : 'text-ink ring-1 ring-inset ring-ink/20 hover:bg-ink/5',
-            )}
-          >
-            {m.id === mode.id && (
-              <motion.span layoutId="mode-pill" className="absolute inset-0 rounded-full bg-ink" transition={{ type: 'spring', stiffness: 400, damping: 32 }} />
-            )}
-            <span className="relative">{m.label}</span>
-          </button>
-        ))}
-      </div>
+      <Segmented<ModeId> value={id} onChange={setId} size="sm" className="w-fit flex-wrap" options={MODES.map((m) => ({ value: m.id, label: m.label, icon: m.icon }))} />
       <div className="grid gap-2">
         {WHO.map((w, i) => (
-          <div key={w} className="flex items-center justify-between gap-4 rounded-2xl bg-white/60 px-4 py-3 dark:bg-black/20">
-            <span className="text-sm">{w}</span>
-            <motion.span key={mode.id + i} initial={{ y: 8, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="font-mono font-bold">
-              +{mode.rows[i]}
-            </motion.span>
+          <div key={w} className="relative overflow-hidden rounded-2xl border border-line bg-card px-4 py-3">
+            <motion.div
+              aria-hidden
+              className="absolute inset-y-0 left-0 bg-pulse/8"
+              animate={{ width: `${(mode.rows[i] / MAX) * 100}%` }}
+              transition={{ duration: 0.7, ease }}
+            />
+            <div className="relative flex items-center justify-between gap-4">
+              <span className="text-[13px] text-ink-2">{w}</span>
+              <span className={`font-mono text-sm font-semibold ${mode.rows[i] ? 'text-ink' : 'text-ink-3'}`}>
+                +<AnimatedNumber value={mode.rows[i]} />
+              </span>
+            </div>
           </div>
         ))}
       </div>
-      <p className="text-sm text-ink-2">{mode.note}</p>
+      <AnimatePresence mode="wait">
+        <motion.p key={id} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={{ duration: 0.25 }} className="text-[13px] text-ink-2">
+          {mode.note}
+        </motion.p>
+      </AnimatePresence>
     </div>
   );
 }

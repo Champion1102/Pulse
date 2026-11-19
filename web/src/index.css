@@ -3,59 +3,113 @@
 @import '@fontsource-variable/geist-mono';
 
 /*
- * Pulse design tokens
- * - Neutrals: one warm-neutral ramp ("ink" on "paper"); dark mode via prefers-color-scheme.
- * - Accent: one coral ("pulse"). Used for brand + primary actions only.
- * - Answer colours (opt-a..f) are functional, paired with letters, never decoration.
- * - Shape system: controls (buttons, chips) are full pills; inputs rounded-2xl; surfaces rounded-3xl.
+ * Pulse — design system v2
+ * ------------------------------------------------------------------
+ * Neutrals   One cool-neutral ramp: canvas → surface → raised. Ink in three strengths.
+ * Accent     A single "iris" accent for brand + primary intent. Never decoration.
+ * Answers    opt-a..f are functional (always paired with a letter + shape), tuned for
+ *            projector legibility in both themes.
+ * Depth      Hairline borders + layered soft shadows; glass only on floating chrome.
+ * Shape      Controls are pills, inputs 14px, surfaces 22px, hero surfaces 32px.
+ * Motion     One signature ease (--ease-out-expo) and springs from lib/motion.ts.
+ * Themes     data-theme="light|dark" on <html>; "system" resolves via media query.
  */
+
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
+
 @theme {
   --font-sans: 'Geist Variable', ui-sans-serif, system-ui, sans-serif;
   --font-mono: 'Geist Mono Variable', ui-monospace, monospace;
 
-  --color-paper: #f4f3ef;
-  --color-paper-2: #eae8e1;
-  --color-card: #fbfbf9;
-  --color-ink: #141413;
-  --color-ink-2: #55534d;
-  --color-line: #dcd9d0;
+  /* neutrals (light) */
+  --color-paper: #f7f7f5;
+  --color-paper-2: #efefec;
+  --color-card: #ffffff;
+  --color-raised: #ffffff;
+  --color-ink: #0c0c0e;
+  --color-ink-2: #5c5c63;
+  --color-ink-3: #8f8f97;
+  --color-line: #e6e6e3;
+  --color-line-strong: #d4d4d0;
 
-  --color-pulse: #f0532f;
-  --color-pulse-ink: #fff8f5;
-  --color-pulse-soft: #fde3da;
+  /* accent */
+  --color-pulse: #5b46f6;
+  --color-pulse-2: #8a5cff;
+  --color-pulse-ink: #ffffff;
+  --color-pulse-soft: #eeebff;
 
-  --color-good: #16835a;
-  --color-bad: #c9372c;
+  /* semantic */
+  --color-good: #11a05a;
+  --color-good-soft: #e3f6ec;
+  --color-bad: #e5484d;
+  --color-bad-soft: #fdeaea;
+  --color-warn: #e8930c;
 
-  --color-opt-a: #2259d6;
-  --color-opt-b: #e8a21a;
-  --color-opt-c: #0f8a7e;
-  --color-opt-d: #7b4bd1;
-  --color-opt-e: #4f7d1a;
-  --color-opt-f: #b8336a;
+  /* answers */
+  --color-opt-a: #3d74f5;
+  --color-opt-b: #f2a41f;
+  --color-opt-c: #0fa892;
+  --color-opt-d: #e0468d;
+  --color-opt-e: #6d9f2b;
+  --color-opt-f: #f0712c;
 
-  --animate-marquee: marquee 38s linear infinite;
-  --animate-beat: beat 1.6s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  --radius-surface: 22px;
+
+  --shadow-soft: 0 1px 2px rgb(12 12 14 / 0.04), 0 4px 16px -6px rgb(12 12 14 / 0.08);
+  --shadow-lift: 0 1px 2px rgb(12 12 14 / 0.05), 0 12px 32px -12px rgb(12 12 14 / 0.18);
+  --shadow-float: 0 2px 6px rgb(12 12 14 / 0.06), 0 30px 60px -20px rgb(12 12 14 / 0.3);
+  --shadow-glow: 0 8px 30px -8px color-mix(in oklab, var(--color-pulse) 55%, transparent);
+
+  --animate-marquee: marquee 40s linear infinite;
+  --animate-beat: beat 1.8s var(--ease-out-expo) infinite;
+  --animate-shimmer: shimmer 1.6s linear infinite;
+  --animate-float: float 6s ease-in-out infinite;
+  --animate-spin-slow: spin 14s linear infinite;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --color-paper: #0f0f10;
-    --color-paper-2: #1a1a1c;
-    --color-card: #161618;
-    --color-ink: #f2f1ec;
-    --color-ink-2: #a7a59d;
-    --color-line: #2b2b2e;
-    --color-pulse-soft: #3a1a12;
-  }
+[data-theme='dark'] {
+  --color-paper: #09090b;
+  --color-paper-2: #141417;
+  --color-card: #101013;
+  --color-raised: #17171b;
+  --color-ink: #f4f4f6;
+  --color-ink-2: #a3a3ad;
+  --color-ink-3: #6c6c76;
+  --color-line: #222227;
+  --color-line-strong: #303037;
+
+  --color-pulse: #7564ff;
+  --color-pulse-2: #a07bff;
+  --color-pulse-soft: #1d1840;
+
+  --color-good: #2fbf71;
+  --color-good-soft: #0f2a1c;
+  --color-bad: #f2555a;
+  --color-bad-soft: #2f1214;
+
+  --shadow-soft: 0 1px 0 rgb(255 255 255 / 0.03) inset, 0 4px 16px -6px rgb(0 0 0 / 0.5);
+  --shadow-lift: 0 1px 0 rgb(255 255 255 / 0.04) inset, 0 16px 40px -14px rgb(0 0 0 / 0.7);
+  --shadow-float: 0 1px 0 rgb(255 255 255 / 0.05) inset, 0 30px 70px -20px rgb(0 0 0 / 0.85);
+  color-scheme: dark;
 }
 
-@keyframes marquee {
-  to { transform: translateX(-50%); }
-}
+[data-theme='light'] { color-scheme: light; }
+
+@keyframes marquee { to { transform: translateX(-50%); } }
 @keyframes beat {
-  0% { transform: scale(0.85); opacity: 0.7; }
-  70%, 100% { transform: scale(1.6); opacity: 0; }
+  0% { transform: scale(0.8); opacity: 0.65; }
+  70%, 100% { transform: scale(1.7); opacity: 0; }
+}
+@keyframes shimmer {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -63,10 +117,126 @@
     animation-duration: 0.001ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
   }
 }
 
-html { background: var(--color-paper); color: var(--color-ink); -webkit-tap-highlight-color: transparent; }
-body { font-family: var(--font-sans); font-feature-settings: 'ss01'; }
-::selection { background: var(--color-pulse); color: var(--color-pulse-ink); }
-:focus-visible { outline: 2px solid var(--color-pulse); outline-offset: 2px; }
+html {
+  background: var(--color-paper);
+  color: var(--color-ink);
+  -webkit-tap-highlight-color: transparent;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  scroll-behavior: smooth;
+}
+body {
+  background: var(--color-paper);
+  font-family: var(--font-sans);
+  font-feature-settings: 'ss01', 'cv11';
+  transition: background-color 0.4s var(--ease-out-expo), color 0.4s var(--ease-out-expo);
+}
+::selection { background: color-mix(in oklab, var(--color-pulse) 28%, transparent); color: var(--color-ink); }
+:focus-visible { outline: 2px solid var(--color-pulse); outline-offset: 2px; border-radius: 10px; }
+
+/* thin, quiet scrollbars */
+* { scrollbar-width: thin; scrollbar-color: var(--color-line-strong) transparent; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: var(--color-line-strong); border-radius: 99px; border: 3px solid var(--color-paper); }
+
+/* number inputs: no spinners */
+input[type='number']::-webkit-inner-spin-button,
+input[type='number']::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+input[type='number'] { -moz-appearance: textfield; }
+
+@utility tabular { font-variant-numeric: tabular-nums; }
+
+/* Text with the brand gradient. */
+@utility text-gradient {
+  background: linear-gradient(100deg, var(--color-pulse) 10%, var(--color-pulse-2) 55%, #ff7a9c 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Fine dotted grid that fades out; used behind hero areas. */
+@utility bg-grid {
+  background-image: radial-gradient(circle at 1px 1px, color-mix(in oklab, var(--color-ink) 9%, transparent) 1px, transparent 0);
+  background-size: 22px 22px;
+  mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 40%, transparent 100%);
+}
+
+/* Floating glass chrome (nav bars, docks, palettes). */
+@utility glass {
+  background: color-mix(in oklab, var(--color-card) 72%, transparent);
+  backdrop-filter: saturate(1.6) blur(18px);
+  -webkit-backdrop-filter: saturate(1.6) blur(18px);
+}
+
+/* Skeleton shimmer. */
+@utility shimmer {
+  background: linear-gradient(90deg, var(--color-paper-2) 25%, color-mix(in oklab, var(--color-paper-2) 40%, var(--color-card)) 37%, var(--color-paper-2) 63%);
+  background-size: 400% 100%;
+  animation: var(--animate-shimmer);
+}
+
+/* Hairline gradient border that follows the cursor (see <Spotlight>). */
+.spotlight {
+  position: relative;
+  isolation: isolate;
+}
+.spotlight::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: radial-gradient(420px circle at var(--mx, 50%) var(--my, 50%), color-mix(in oklab, var(--color-pulse) 70%, transparent), transparent 45%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  opacity: 0;
+  transition: opacity 0.35s var(--ease-out-expo);
+  pointer-events: none;
+  z-index: 1;
+}
+.spotlight::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(600px circle at var(--mx, 50%) var(--my, 50%), color-mix(in oklab, var(--color-pulse) 7%, transparent), transparent 40%);
+  opacity: 0;
+  transition: opacity 0.35s var(--ease-out-expo);
+  pointer-events: none;
+  z-index: -1;
+}
+.spotlight:hover::before, .spotlight:hover::after { opacity: 1; }
+
+/* Primary button sheen sweep. */
+.sheen { position: relative; overflow: hidden; }
+.sheen::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(110deg, transparent 30%, rgb(255 255 255 / 0.28) 50%, transparent 70%);
+  transform: translateX(-120%);
+  transition: transform 0.9s var(--ease-out-expo);
+  pointer-events: none;
+}
+.sheen:hover::after { transform: translateX(120%); }
+
+/* Soft film grain over marketing surfaces. */
+.grain::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 60;
+  opacity: 0.035;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+[data-theme='dark'] .grain::before { opacity: 0.06; }
+
+/* View-transition crossfade when switching themes. */
+::view-transition-old(root), ::view-transition-new(root) { animation-duration: 0.45s; animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1); }

@@ -1,7 +1,9 @@
 import { lazy, StrictMode, Suspense } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter, Route, Routes } from 'react-router';
+import { CommandPalette } from './components/CommandPalette';
 import { ToastProvider } from './components/Toast';
+import { LogoMark } from './components/ui';
 import './index.css';
 
 // Each screen is its own chunk: students on phones only download the play screen.
@@ -18,11 +20,24 @@ const Reports = lazy(() => import('./pages/app/Reports'));
 const Report = lazy(() => import('./pages/app/Report'));
 const Settings = lazy(() => import('./pages/app/Settings'));
 
+/** Route-level loading state: a quietly breathing mark. */
+function Splash() {
+  return (
+    <div className="grid min-h-[100dvh] place-items-center">
+      <div className="relative grid place-items-center">
+        <span className="absolute size-10 animate-beat rounded-2xl bg-pulse/30" />
+        <LogoMark className="!size-10" />
+      </div>
+    </div>
+  );
+}
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ToastProvider>
       <BrowserRouter>
-        <Suspense fallback={<div className="min-h-[100dvh]" />}>
+        <CommandPalette />
+        <Suspense fallback={<Splash />}>
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/play" element={<Play />} />

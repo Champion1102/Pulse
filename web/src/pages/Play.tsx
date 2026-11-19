@@ -1,12 +1,16 @@
-import { ArrowRight, ChartBar, CheckCircle, Fire, Timer, Trophy, WifiSlash, XCircle } from '@phosphor-icons/react';
-import { AnimatePresence, motion } from 'motion/react';
+import { ArrowRight, ChartBar, Check, CheckCircle, Fire, Timer, Trophy, WifiSlash, XCircle } from '@phosphor-icons/react';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import type { Socket } from 'socket.io-client';
+import { Confetti } from '../components/Confetti';
 import { OptionTile } from '../components/OptionTile';
 import { useToast } from '../components/Toast';
-import { Button, cx, Input, Logo } from '../components/ui';
+import { AnimatedNumber, Avatar, Button, Chip, cx, Input, Logo, ThemeToggle } from '../components/ui';
 import { api } from '../lib/api';
+import { haptic } from '../lib/haptics';
+import { ease, spring } from '../lib/motion';
+import { sfx } from '../lib/sfx';
 import { connect, emit } from '../lib/socket';
 import type { AnswerPayload, LeaderboardEntry, Player, PlayerRoundResult, RoundStarted } from '../lib/types';
 import { useCountdown } from '../lib/useCountdown';
@@ -111,32 +115,45 @@ export default function Play() {
   }, [params.code, lookup]);
 
   return (
-    <div className="flex min-h-[100dvh] flex-col">
-      <header className="flex h-16 items-center justify-between gap-3 px-4">
-        <Link to="/"><Logo className="!text-lg" /></Link>
-        <div className="flex items-center gap-2">
-          {!online && <span className="flex items-center gap-1 text-sm font-semibold text-bad"><WifiSlash weight="bold" /> Reconnecting</span>}
+    <div className="relative flex min-h-[100dvh] flex-col overflow-x-clip">
+      <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[50vh] bg-[radial-gradient(ellipse_80%_60%_at_50%_-10%,color-mix(in_oklab,var(--color-pulse)_16%,transparent),transparent)]" />
+      <header className="flex h-16 items-center justify-between gap-3 px-4 pt-[env(safe-area-inset-top)]">
+        <Link to="/" aria-label="Pulse home"><Logo className="!text-[17px]" /></Link>
+        <div className="flex items-center gap-1.5">
+          <AnimatePresence>
+            {!online && (
+              <motion.span initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.8 }}>
+                <Chip tone="bad"><WifiSlash weight="bold" /> Reconnecting</Chip>
+              </motion.span>
+            )}
+          </AnimatePresence>
           {me && score && (
-            <span className="rounded-full bg-ink px-3 py-1 font-mono text-sm font-bold text-paper">
-              #{score.rank} · {score.total}
-            </span>
+            <motion.span
+              initial={{ opacity: 0, y: -6 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="inline-flex h-8 items-center gap-2 rounded-full bg-ink px-3.5 font-mono text-[13px] font-bold text-paper shadow-[var(--shadow-soft)]"
+            >
+              <span className="text-paper/60">#{score.rank}</span>
+              <AnimatedNumber value={score.total} />
+            </motion.span>
           )}
+          <ThemeToggle />
         </div>
       </header>
 
-      <main className="mx-auto flex w-full max-w-xl flex-1 flex-col px-4 pb-6">
+      <main className="mx-auto flex w-full max-w-xl flex-1 flex-col px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
         <AnimatePresence mode="wait">
           <motion.div
             key={view + (round?.roundIndex ?? '')}
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -12 }}
-            transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+            initial={{ opacity: 0, y: 16, filter: 'blur(6px)' }}
+            animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+            exit={{ opacity: 0, y: -12, filter: 'blur(6px)' }}
+            transition={{ duration: 0.35, ease }}
             className="flex flex-1 flex-col"
           >
             {view === 'code' && <CodeStep onSubmit={(c) => navigate(`/play/${c}`)} />}
             {view === 'nick' && room && <NickStep room={room} onSubmit={(n) => join(room.code, n)} />}
-            {view === 'lobby' && me && <Lobby me={me} title={room?.quizTitle} count={playerCount} />}
+            {view === 'lobby' && me && <Lobby me={me} title={room?.quizTitle} count={Math.max(playerCount, 1)} />}
             {view === 'question' && round && (
               <QuestionView
                 round={round}
@@ -160,28 +177,71 @@ export default function Play() {
   );
 }
 
+/* ------------------------------------------------------------------ join */
+
 function CodeStep({ onSubmit }: { onSubmit: (code: string) => void }) {
   const [code, setCode] = useState('');
-  const submit = (e: FormEvent) => {
-    e.preventDefault();
+  const [focused, setFocused] = useState(true);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const submit = (e?: FormEvent) => {
+    e?.preventDefault();
     if (code.length >= 4) onSubmit(code);
   };
   return (
-    <form onSubmit={submit} className="my-auto grid gap-6">
-      <h1 className="text-5xl font-bold leading-none tracking-tighter">Got a code?</h1>
-      <div className="grid gap-2">
-        <label htmlFor="code" className="text-sm font-semibold">Room code</label>
-        <Input
+    <form onSubmit={submit} className="my-auto grid gap-8">
+      <div className="grid gap-3">
+        <p className="text-[12px] font-semibold uppercase tracking-[0.16em] text-pulse">Join a live quiz</p>
+        <h1 className="text-[2.75rem] font-semibold leading-[1] tracking-[-0.045em]">Got a code?</h1>
+        <p className="text-ink-2">It is on the projector, six letters and numbers.</p>
+      </div>
+      <div className="relative" onClick={() => inputRef.current?.focus()}>
+        <label htmlFor="code" className="sr-only">Room code</label>
+        <input
+          ref={inputRef}
           id="code"
           autoFocus
           autoComplete="off"
+          autoCapitalize="characters"
+          spellCheck={false}
           value={code}
-          onChange={(e) => setCode(e.target.value.replace(/[^a-z0-9]/gi, '').toUpperCase().slice(0, 6))}
-          className="!h-20 text-center font-mono text-4xl font-bold tracking-[0.25em]"
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+          onChange={(e) => {
+            const next = e.target.value.replace(/[^a-z0-9]/gi, '').toUpperCase().slice(0, 6);
+            if (next.length > code.length) haptic.tap();
+            setCode(next);
+            if (next.length === 6) setTimeout(() => onSubmit(next), 180);
+          }}
+          className="absolute inset-0 z-10 h-full w-full cursor-text opacity-0"
         />
-        <p className="text-sm text-ink-2">It is on the projector, six letters and numbers.</p>
+        <div className="grid grid-cols-6 gap-2" aria-hidden>
+          {Array.from({ length: 6 }, (_, i) => {
+            const ch = code[i];
+            const active = focused && (i === code.length || (code.length === 6 && i === 5));
+            return (
+              <motion.div
+                key={i}
+                animate={{ scale: active ? 1.04 : 1, y: ch ? 0 : 0 }}
+                transition={spring.snappy}
+                className={cx(
+                  'relative grid aspect-[4/5] place-items-center rounded-2xl border bg-card font-mono text-[2rem] font-bold shadow-[var(--shadow-soft)] transition-colors duration-200',
+                  active ? 'border-pulse shadow-[0_0_0_4px_color-mix(in_oklab,var(--color-pulse)_18%,transparent)]' : ch ? 'border-line-strong' : 'border-line',
+                )}
+              >
+                <AnimatePresence mode="popLayout">
+                  {ch && (
+                    <motion.span key={ch + i} initial={{ y: 14, opacity: 0, scale: 0.6 }} animate={{ y: 0, opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.6 }} transition={spring.bouncy}>
+                      {ch}
+                    </motion.span>
+                  )}
+                </AnimatePresence>
+                {active && !ch && <motion.span className="h-8 w-[2px] rounded-full bg-pulse" animate={{ opacity: [1, 0, 1] }} transition={{ repeat: Infinity, duration: 1 }} />}
+              </motion.div>
+            );
+          })}
+        </div>
       </div>
-      <Button size="lg" type="submit" disabled={code.length < 4} icon={<ArrowRight weight="bold" />}>Continue</Button>
+      <Button size="xl" type="submit" disabled={code.length < 4} iconRight={<ArrowRight weight="bold" />}>Continue</Button>
     </form>
   );
 }
@@ -197,38 +257,49 @@ function NickStep({ room, onSubmit }: { room: RoomInfo; onSubmit: (nick: string)
     setBusy(false);
   };
   return (
-    <form onSubmit={submit} className="my-auto grid gap-6">
-      <div>
-        <p className="font-mono text-sm font-bold tracking-widest text-pulse">{room.code}</p>
-        <h1 className="mt-2 text-4xl font-bold leading-tight tracking-tighter">{room.quizTitle}</h1>
+    <form onSubmit={submit} className="my-auto grid gap-8">
+      <div className="grid justify-items-start gap-3">
+        <Chip tone="pulse" className="font-mono tracking-[0.16em]">{room.code}</Chip>
+        <h1 className="text-[2.4rem] font-semibold leading-[1.05] tracking-[-0.04em]">{room.quizTitle}</h1>
       </div>
-      <div className="grid gap-2">
-        <label htmlFor="nick" className="text-sm font-semibold">Your nickname</label>
-        <Input id="nick" autoFocus maxLength={24} value={nick} onChange={(e) => setNick(e.target.value)} className="!h-16 text-2xl font-semibold" />
-        <p className="text-sm text-ink-2">This is what shows on the leaderboard.</p>
+      <div className="grid gap-3">
+        <label htmlFor="nick" className="text-[13px] font-semibold">Your nickname</label>
+        <div className="relative">
+          <motion.div key={(nick.trim()[0] ?? '?').toUpperCase()} initial={{ scale: 0.5, rotate: -20 }} animate={{ scale: 1, rotate: 0 }} transition={spring.bouncy} className="absolute left-3 top-1/2 z-10 -translate-y-1/2">
+            <Avatar name={nick.trim() || '?'} size="lg" />
+          </motion.div>
+          <Input id="nick" autoFocus maxLength={24} value={nick} onChange={(e) => setNick(e.target.value)} className="!h-[4.5rem] !rounded-[20px] !pl-[4.5rem] text-2xl font-semibold" />
+        </div>
+        <p className="text-[13px] text-ink-3">This is what shows on the leaderboard.</p>
       </div>
-      <Button size="lg" type="submit" loading={busy} disabled={!nick.trim()}>Join the room</Button>
+      <Button size="xl" type="submit" loading={busy} disabled={!nick.trim()} iconRight={<ArrowRight weight="bold" />}>Join the room</Button>
     </form>
   );
 }
 
 function Lobby({ me, title, count }: { me: Player; title?: string; count: number }) {
   return (
-    <div className="my-auto grid justify-items-center gap-8 text-center">
-      <div className="relative grid size-40 place-items-center">
-        <span className="absolute inset-0 animate-beat rounded-full bg-pulse/30" />
-        <span className="relative grid size-28 place-items-center rounded-full bg-pulse text-4xl font-bold text-pulse-ink">
-          {me.nickname.slice(0, 1).toUpperCase()}
-        </span>
+    <div className="my-auto grid justify-items-center gap-9 text-center">
+      <div className="relative grid size-48 place-items-center">
+        <span className="absolute inset-4 animate-beat rounded-full bg-pulse/25" />
+        <span className="absolute inset-4 animate-beat rounded-full bg-pulse/20 [animation-delay:0.6s]" />
+        <span className="absolute inset-4 animate-beat rounded-full bg-pulse/15 [animation-delay:1.2s]" />
+        <motion.div initial={{ scale: 0.4, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={spring.bouncy}>
+          <Avatar name={me.nickname} size="xl" className="ring-8 ring-paper" />
+        </motion.div>
       </div>
       <div className="grid gap-2">
-        <h1 className="text-4xl font-bold tracking-tighter">You're in, {me.nickname}.</h1>
+        <h1 className="text-[2.4rem] font-semibold leading-tight tracking-[-0.04em]">You're in, {me.nickname}.</h1>
         <p className="text-ink-2">{title ? `${title}. ` : ''}Waiting for the instructor to start.</p>
       </div>
-      <p className="rounded-full bg-paper-2 px-4 py-1.5 text-sm font-semibold">{count} {count === 1 ? 'player' : 'players'} here</p>
+      <Chip tone="good" dot className="!h-8 !px-4 !text-[13px]">
+        <AnimatedNumber value={count} /> {count === 1 ? 'player' : 'players'} here
+      </Chip>
     </div>
   );
 }
+
+/* ------------------------------------------------------------------ question */
 
 function QuestionView({ round, onAnswer }: { round: RoundStarted; onAnswer: (a: AnswerPayload) => void }) {
   const q = round.question;
@@ -236,23 +307,28 @@ function QuestionView({ round, onAnswer }: { round: RoundStarted; onAnswer: (a: 
   const [picked, setPicked] = useState<string[]>([]);
   const [num, setNum] = useState('');
   const total = q.timeLimitSec;
+  const urgent = left <= 5;
 
   return (
-    <div className="flex flex-1 flex-col gap-5 pt-2">
-      <div className="grid gap-3">
-        <div className="flex items-center justify-between text-sm font-semibold text-ink-2">
-          <span>Question {round.roundIndex + 1} of {round.totalRounds}</span>
-          <span className={cx('font-mono text-lg font-bold', left <= 5 ? 'text-bad' : 'text-ink')}>{left}s</span>
+    <div className="flex flex-1 flex-col gap-6 pt-2">
+      <div className="grid gap-4">
+        <div className="flex items-center justify-between text-[13px] font-semibold text-ink-2">
+          <span>Question {round.roundIndex + 1} <span className="text-ink-3">of {round.totalRounds}</span></span>
+          <motion.span key={urgent ? left : 'c'} animate={urgent ? { scale: [1.25, 1] } : {}} className={cx('inline-flex items-center gap-1 font-mono text-lg font-bold tabular', urgent ? 'text-bad' : 'text-ink')}>
+            <Timer weight="bold" size={16} /> {left}s
+          </motion.span>
         </div>
-        <div className="h-1.5 overflow-hidden rounded-full">
+        <div className="h-1.5 overflow-hidden rounded-full bg-line">
           <motion.div
-            className="h-full origin-left rounded-full bg-pulse"
+            className={cx('h-full origin-left rounded-full', urgent ? 'bg-bad' : 'bg-gradient-to-r from-pulse to-pulse-2')}
             initial={{ scaleX: Math.min(1, left / total) || 1 }}
             animate={{ scaleX: 0 }}
             transition={{ duration: Math.max(0, (round.endsAt - round.serverNow) / 1000), ease: 'linear' }}
           />
         </div>
-        <h1 className="text-2xl font-bold leading-snug tracking-tight sm:text-3xl">{q.prompt}</h1>
+        <motion.h1 initial={{ opacity: 0, filter: 'blur(8px)' }} animate={{ opacity: 1, filter: 'blur(0px)' }} transition={{ duration: 0.6, ease }} className="text-[1.75rem] font-semibold leading-[1.15] tracking-[-0.03em] sm:text-3xl">
+          {q.prompt}
+        </motion.h1>
       </div>
 
       {q.input === 'number' ? (
@@ -261,31 +337,52 @@ function QuestionView({ round, onAnswer }: { round: RoundStarted; onAnswer: (a: 
           onSubmit={(e) => {
             e.preventDefault();
             const value = Number(num);
-            if (num.trim() !== '' && Number.isFinite(value)) onAnswer({ kind: 'numeric', value });
+            if (num.trim() !== '' && Number.isFinite(value)) {
+              haptic.select();
+              sfx.tap();
+              onAnswer({ kind: 'numeric', value });
+            }
           }}
         >
-          <label htmlFor="num" className="text-sm font-semibold">Your answer</label>
-          <Input id="num" autoFocus type="number" step="any" inputMode="decimal" value={num} onChange={(e) => setNum(e.target.value)} className="!h-20 text-center font-mono text-4xl font-bold" />
-          <Button size="lg" type="submit" disabled={num.trim() === ''}>Submit</Button>
+          <label htmlFor="num" className="text-[13px] font-semibold">Your answer</label>
+          <Input id="num" autoFocus type="number" step="any" inputMode="decimal" value={num} onChange={(e) => setNum(e.target.value)} className="!h-24 !rounded-[22px] text-center font-mono text-5xl font-bold" />
+          <Button size="xl" type="submit" disabled={num.trim() === ''}>Submit</Button>
         </form>
       ) : (
         <div className="mt-auto grid gap-3">
-          {q.options!.map((o, i) => (
-            <OptionTile
-              key={o.id}
-              index={i}
-              text={o.text}
-              selected={picked.includes(o.id)}
-              onClick={() => {
-                if (q.input === 'single') onAnswer({ kind: 'choice', optionIds: [o.id] });
-                else setPicked((p) => (p.includes(o.id) ? p.filter((x) => x !== o.id) : [...p, o.id]));
-              }}
-            />
-          ))}
+          {q.options!.map((o, i) => {
+            const on = picked.includes(o.id);
+            return (
+              <motion.div key={o.id} className="relative" initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ ...spring.smooth, delay: 0.1 + i * 0.05 }}>
+                <OptionTile
+                  index={i}
+                  text={o.text}
+                  selected={on}
+                  onClick={() => {
+                    haptic.tap();
+                    sfx.tap();
+                    if (q.input === 'single') onAnswer({ kind: 'choice', optionIds: [o.id] });
+                    else setPicked((p) => (p.includes(o.id) ? p.filter((x) => x !== o.id) : [...p, o.id]));
+                  }}
+                />
+                {q.input === 'multiple' && (
+                  <span
+                    aria-hidden
+                    className={cx(
+                      'pointer-events-none absolute right-4 top-1/2 grid size-8 -translate-y-1/2 place-items-center rounded-full border-2 transition duration-200',
+                      on ? 'border-white bg-white text-ink' : 'border-white/60',
+                    )}
+                  >
+                    <AnimatePresence>{on && <motion.span initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }} transition={spring.bouncy}><Check weight="bold" /></motion.span>}</AnimatePresence>
+                  </span>
+                )}
+              </motion.div>
+            );
+          })}
           {q.input === 'multiple' && (
             <>
-              <p className="text-center text-sm text-ink-2">Pick every answer that applies.</p>
-              <Button size="lg" variant="ink" disabled={!picked.length} onClick={() => onAnswer({ kind: 'choice', optionIds: picked })}>
+              <p className="text-center text-[13px] text-ink-3">Pick every answer that applies.</p>
+              <Button size="xl" variant="ink" disabled={!picked.length} onClick={() => { haptic.select(); onAnswer({ kind: 'choice', optionIds: picked }); }}>
                 Submit {picked.length ? `(${picked.length})` : ''}
               </Button>
             </>
@@ -298,60 +395,122 @@ function QuestionView({ round, onAnswer }: { round: RoundStarted; onAnswer: (a: 
 
 function Waiting({ title, body }: { title: string; body: string }) {
   return (
-    <div className="my-auto grid justify-items-center gap-4 text-center">
-      <div className="flex gap-2">
-        {[0, 1, 2].map((i) => (
-          <motion.span key={i} className="size-3 rounded-full bg-pulse" animate={{ y: [0, -10, 0] }} transition={{ repeat: Infinity, duration: 0.9, delay: i * 0.15 }} />
-        ))}
+    <div className="my-auto grid justify-items-center gap-6 text-center">
+      <div className="relative grid size-28 place-items-center">
+        <motion.span className="absolute inset-0 rounded-full border-2 border-pulse/20 border-t-pulse" animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1.2, ease: 'linear' }} />
+        <motion.span initial={{ scale: 0 }} animate={{ scale: 1 }} transition={spring.bouncy} className="grid size-16 place-items-center rounded-full bg-pulse text-2xl text-white shadow-[var(--shadow-glow)]">
+          <Check weight="bold" />
+        </motion.span>
       </div>
-      <h1 className="text-3xl font-bold tracking-tighter">{title}</h1>
+      <h1 className="text-3xl font-semibold tracking-[-0.035em]">{title}</h1>
       <p className="text-ink-2">{body}</p>
     </div>
   );
 }
 
+/* ------------------------------------------------------------------ result */
+
 function ResultView({ result, score }: { result: PlayerRoundResult; score: LeaderboardEntry | null }) {
+  const reduce = useReducedMotion();
   const poll = result.correct === null;
-  const tone = poll ? 'bg-ink text-paper' : result.correct ? 'bg-good text-white' : 'bg-bad text-white';
+  const tone = poll
+    ? 'bg-gradient-to-br from-ink to-[color-mix(in_oklab,var(--color-ink)_80%,var(--color-pulse))] text-paper'
+    : result.correct
+      ? 'bg-gradient-to-br from-good to-[color-mix(in_oklab,var(--color-good)_70%,#0fa892)] text-white'
+      : 'bg-gradient-to-br from-bad to-[color-mix(in_oklab,var(--color-bad)_75%,#e0468d)] text-white';
   const Icon = poll ? ChartBar : result.correct ? CheckCircle : result.answered ? XCircle : Timer;
   const title = poll ? (result.answered ? 'Vote counted' : 'Poll closed') : result.correct ? 'Correct!' : result.answered ? 'Not this time' : "Time's up";
+  const [fire, setFire] = useState(0);
+  useEffect(() => {
+    if (poll) return;
+    if (result.correct) {
+      haptic.success();
+      sfx.correct();
+      setFire(Date.now());
+    } else {
+      haptic.error();
+      sfx.wrong();
+    }
+  }, [poll, result.correct]);
+  const wrong = !poll && !result.correct;
   return (
-    <motion.div
-      initial={{ scale: 0.92 }}
-      animate={{ scale: 1 }}
-      transition={{ type: 'spring', stiffness: 260, damping: 18 }}
-      className={cx('my-auto grid justify-items-center gap-5 rounded-[2.5rem] px-6 py-14 text-center', tone)}
-    >
-      <Icon size={88} weight="fill" />
-      <h1 className="text-5xl font-bold tracking-tighter">{title}</h1>
-      {score && !poll && (
-        <div className="grid gap-1 text-lg font-semibold opacity-90">
-          <p className="font-mono text-3xl font-bold">+{score.lastPoints}</p>
-          <p>You are #{score.rank} with {score.total} points</p>
-          {score.streak > 1 && <p className="flex items-center justify-center gap-1"><Fire weight="fill" /> {score.streak} in a row</p>}
-        </div>
-      )}
-    </motion.div>
+    <>
+      <Confetti fire={fire} origin={{ x: 0.5, y: 0.4 }} />
+      <motion.div
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={wrong && !reduce ? { scale: 1, opacity: 1, x: [0, -10, 10, -6, 6, 0] } : { scale: 1, opacity: 1 }}
+        transition={wrong ? { duration: 0.5, ease } : spring.bouncy}
+        className={cx('relative my-auto grid justify-items-center gap-5 overflow-hidden rounded-[36px] px-6 py-16 text-center shadow-[var(--shadow-float)]', tone)}
+      >
+        <span aria-hidden className="absolute inset-x-0 top-0 h-1/2 bg-gradient-to-b from-white/15 to-transparent" />
+        <span aria-hidden className="absolute -right-16 -top-16 size-56 rounded-full bg-white/10 blur-2xl" />
+        <motion.span initial={{ scale: 0, rotate: -40 }} animate={{ scale: 1, rotate: 0 }} transition={{ ...spring.bouncy, delay: 0.1 }} className="relative">
+          <Icon size={92} weight="fill" />
+        </motion.span>
+        <h1 className="relative text-5xl font-semibold tracking-[-0.045em]">{title}</h1>
+        {score && !poll && (
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25, duration: 0.5, ease }} className="relative grid gap-2 text-lg font-semibold">
+            <p className="font-mono text-4xl font-bold">+<AnimatedNumber value={score.lastPoints} /></p>
+            <p className="opacity-85">You are #{score.rank} with <AnimatedNumber value={score.total} /> points</p>
+            {score.streak > 1 && (
+              <motion.p initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ ...spring.bouncy, delay: 0.5 }} className="mx-auto mt-1 inline-flex items-center gap-1.5 rounded-full bg-white/20 px-4 py-1.5 text-base">
+                <Fire weight="fill" className="text-[#ffd27a]" /> {score.streak} in a row
+              </motion.p>
+            )}
+          </motion.div>
+        )}
+      </motion.div>
+    </>
   );
 }
 
 function Ended({ score, board }: { score: LeaderboardEntry | null; board: LeaderboardEntry[] }) {
+  const [fire, setFire] = useState(0);
+  useEffect(() => {
+    if (score && score.rank <= 3) {
+      const t = setTimeout(() => {
+        setFire(Date.now());
+        haptic.celebrate();
+        sfx.fanfare();
+      }, 400);
+      return () => clearTimeout(t);
+    }
+  }, [score]);
   return (
     <div className="my-auto grid gap-8">
+      <Confetti fire={fire} origin={{ x: 0.5, y: 0.25 }} count={200} />
       <div className="grid justify-items-center gap-3 text-center">
-        <Trophy size={64} weight="duotone" className="text-pulse" />
-        <h1 className="text-5xl font-bold tracking-tighter">That's a wrap.</h1>
-        {score && <p className="text-lg text-ink-2">You finished #{score.rank} with {score.total} points.</p>}
+        <motion.div initial={{ scale: 0, rotate: -30 }} animate={{ scale: 1, rotate: 0 }} transition={spring.bouncy} className="relative grid size-24 place-items-center">
+          <span className="absolute inset-0 rounded-3xl bg-pulse/20 blur-xl" />
+          <span className="relative grid size-20 place-items-center rounded-3xl bg-gradient-to-br from-pulse to-pulse-2 text-white shadow-[var(--shadow-glow)]">
+            <Trophy size={44} weight="fill" />
+          </span>
+        </motion.div>
+        <h1 className="text-5xl font-semibold tracking-[-0.045em]">That's a wrap.</h1>
+        {score && <p className="text-lg text-ink-2">You finished <b className="text-ink">#{score.rank}</b> with <AnimatedNumber value={score.total} className="font-semibold text-ink" /> points.</p>}
       </div>
       {board.length > 0 && (
         <ol className="grid gap-2">
-          {board.slice(0, 5).map((e) => (
-            <li key={e.playerId} className={cx('flex items-center gap-3 rounded-2xl px-4 py-3', e.playerId === score?.playerId ? 'bg-pulse text-pulse-ink' : 'bg-card')}>
-              <span className="w-6 font-mono font-bold">{e.rank}</span>
-              <span className="flex-1 font-semibold">{e.nickname}</span>
-              <span className="font-mono font-bold">{e.total}</span>
-            </li>
-          ))}
+          {board.slice(0, 5).map((e, i) => {
+            const self = e.playerId === score?.playerId;
+            return (
+              <motion.li
+                key={e.playerId}
+                initial={{ opacity: 0, x: -12 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.3 + i * 0.06, duration: 0.45, ease }}
+                className={cx(
+                  'flex items-center gap-3 rounded-2xl px-3 py-2.5',
+                  self ? 'bg-pulse text-pulse-ink shadow-[var(--shadow-glow)]' : 'border border-line bg-card',
+                )}
+              >
+                <span className={cx('w-6 text-center font-mono font-bold', self ? 'text-pulse-ink/70' : 'text-ink-3')}>{e.rank}</span>
+                <Avatar name={e.nickname} size="sm" />
+                <span className="flex-1 truncate font-semibold">{e.nickname}{self && ' (you)'}</span>
+                <span className="font-mono font-bold">{e.total}</span>
+              </motion.li>
+            );
+          })}
         </ol>
       )}
       <Link to="/" className="justify-self-center"><Button variant="ghost">Back to Pulse</Button></Link>
